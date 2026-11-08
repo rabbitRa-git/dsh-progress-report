@@ -1,6 +1,6 @@
 {
   "name": "dsh-progress-report",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Make a DSH agent report progress on long tasks: a host-side timer injects a one-line progress notice after N minutes or M tool calls. Zero dependencies, settings page, trigger log.",
   "keywords": [
     "dsh",
@@ -32,10 +32,13 @@
     "lib",
     "client.js",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:clean": "node test/cleanroom.mjs",
+    "check": "node --check lib/index.js && node --check client.js"
   },
   "engines": {
     "node": ">=22"
