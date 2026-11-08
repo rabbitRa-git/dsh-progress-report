@@ -95,6 +95,16 @@ dsh plugin --profile desktop add dsh-progress-report
 
 实际差别在注入形态：notice 直接送到模型，但不会在对话里冒充用户说过什么，也就不会被后来的压缩当成"用户说过这句话"。
 
+## 开发与测试
+
+```bash
+npm test          # node --test test/*.test.mjs，13 条，不需要装任何依赖
+```
+
+测试覆盖：触发阈值、计数归零、真人发话重置、文案占位符、慢工具点名、子代理不提醒、越界钳位、非法值回默认、中英双语、存档往返、首次播种。CI 在 `.github/workflows/ci.yml`（node 22/24 矩阵 + 零依赖断言）。
+
+插件不绑 profile：路径全部来自 `DSH_HOME`，desktop 与 bili-duty 用的是同一份代码，只是各自的 `progress-report.json` 与日志分开。
+
 ## 卸载
 
 ```bash
