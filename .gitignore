@@ -1,0 +1,10 @@
+node_modules/
+*.tgz
+*.log
+prev_*.png
+shot_*.png
+out.mp4
+voice.wav
+t*.wav
+t*.mp3
+.DS_Store
