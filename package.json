@@ -1,0 +1,51 @@
+{
+  "name": "dsh-progress-report",
+  "version": "0.3.1",
+  "description": "DSH 插件：长任务期间按时间/步数强制模型向用户汇报进度，跑偏可及时纠正。零依赖，带设置页。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "progress",
+    "report"
+  ],
+  "license": "MIT",
+  "author": "rabbitRa-git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rabbitRa-git/dsh-progress-report.git"
+  },
+  "homepage": "https://github.com/rabbitRa-git/dsh-progress-report#readme",
+  "bugs": {
+    "url": "https://github.com/rabbitRa-git/dsh-progress-report/issues"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {},
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  }
+}
