@@ -228,3 +228,93 @@ test('配置文件不存在时，插件自己播种一份', () => {
   assert.equal(seeded.maxToolCalls, 4);
   assert.equal(seeded.lang, 'auto');
 });
+
+/** 假时钟：把"现在"往后拨，模拟时间流逝。 */
+function withClock(offsetMs, fn) {
+  const real = Date.now;
+  Date.now = () => real() + offsetMs;
+  try {
+    return fn();
+  } finally {
+    Date.now = real;
+  }
+}
+
+const textOf = (out) => out.additionalContexts[0].content[0].text;
+
+test('第一次给完整规则，第二次只给一行', async () => {
+  const { handlers, exec } = boot({
+    intervalMinutes: 1440,
+    maxToolCalls: 1,
+    minGapMinutes: 0,
+    minToolCalls: 1,
+  });
+  const first = textOf(await callHook(handlers, 'tools/post-execute', exec(), {}, passThrough));
+  const second = textOf(await callHook(handlers, 'tools/post-execute', exec(), {}, passThrough));
+
+  assert.ok(first.split('\n').length > 5, '第一条应该是完整规则');
+  assert.equal(
+    second.split('\n').filter((l) => l.trim() !== '').length,
+    1,
+    '第二条应该只剩一行',
+  );
+  assert.match(second, /进度检查点/);
+});
+
+test('模型自己说了可见文字，计时器就清零', async () => {
+  const { handlers, exec } = boot({
+    intervalMinutes: 0.5,
+    maxToolCalls: 0,
+    minGapMinutes: 0,
+    minToolCalls: 1,
+  });
+  // 先建立状态（此刻计时器从这里开始）
+  await callHook(handlers, 'tools/post-execute', exec(), {}, passThrough);
+  // 过了 2 分钟，到点触发一次
+  const first = await withClock(120_000, () =>
+    callHook(handlers, 'tools/post-execute', exec(), {}, passThrough),
+  );
+  assert.ok(first.additionalContexts, '应该先触发一次');
+
+  // 模型流式输出了一段人话
+  await withClock(200_000, () =>
+    callHook(handlers, 'agent/assistant-stream', {
+      frame: { chunk: { type: 'text-delta', text: '进度 2/5 · 正在跑测试' } },
+    }),
+  );
+
+  // 同一时刻又调了工具：刚说过话，不该再提醒
+  const after = await withClock(200_000, () =>
+    callHook(handlers, 'tools/post-execute', exec(), {}, passThrough),
+  );
+  assert.equal(after.additionalContexts, undefined, '说过话之后不该马上又提醒');
+});
+
+test('推理过程不算汇报', async () => {
+  const { handlers, exec } = boot({
+    intervalMinutes: 0.5,
+    maxToolCalls: 0,
+    minGapMinutes: 0,
+    minToolCalls: 1,
+  });
+  await callHook(handlers, 'tools/post-execute', exec(), {}, passThrough);
+  await withClock(120_000, () => callHook(handlers, 'tools/post-execute', exec(), {}, passThrough));
+  // reasoning-delta 是内部思考，用户看不见，不算汇报
+  await withClock(200_000, () =>
+    callHook(handlers, 'agent/assistant-stream', {
+      frame: { chunk: { type: 'reasoning-delta', text: '让我想想……' } },
+    }),
+  );
+  const after = await withClock(200_000, () =>
+    callHook(handlers, 'tools/post-execute', exec(), {}, passThrough),
+  );
+  assert.ok(after.additionalContexts, '只在心里想不算汇报，该提醒还得提醒');
+});
+
+test('自定义文案不区分首条与后续', () => {
+  const cfg = { ...testing.DEFAULTS, template: '自定义 {minutes} 分钟 {calls} 次' };
+  const a = testing.buildText(5, 3, cfg, null);
+  const b = testing.buildText(5, 3, cfg, null, { short: true });
+  assert.equal(a, '自定义 5 分钟 3 次');
+  assert.equal(b, a);
+});
