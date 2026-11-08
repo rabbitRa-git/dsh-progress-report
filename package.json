@@ -1,6 +1,6 @@
 {
   "name": "dsh-progress-report",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Make a DSH agent report progress on long tasks: a host-side timer injects a one-line progress notice after N minutes or M tool calls. Zero dependencies, settings page, trigger log.",
   "keywords": [
     "dsh",
