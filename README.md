@@ -22,6 +22,8 @@ dsh plugin --profile desktop add dsh-progress-report
 
 装完打开 **设置 › 进度汇报**，点一下 **发一条测试提醒** —— 对话里应该立刻收到一条提醒。
 
+![设置页](https://raw.githubusercontent.com/rabbitRa-git/dsh-progress-report/main/docs/settings.png)
+
 ---
 
 ## 为什么不用 AGENTS.md
@@ -30,29 +32,41 @@ dsh plugin --profile desktop add dsh-progress-report
 
 ## 它什么时候提醒
 
-两个条件谁先满足都算：
+三个条件谁先满足都算：
 
 | 条件 | 默认 | 说明 |
 | --- | --- | --- |
 | `intervalMinutes` | 10 分钟 | 距上一次汇报的时间 |
 | `maxToolCalls` | 12 次 | 连续这么多次工具调用没汇报（另受 `minGapMinutes` 约束，默认 3 分钟） |
 | 慢工具 | `slowToolSeconds` 60 秒 | 单个工具跑得久，结束时会补一句"刚才那个调用跑了多久" |
+| 定时兜底 | 每 30 秒扫一次 | 到点就直接把提醒排进下一步输入，**不依赖下一次工具调用** —— 覆盖"一直思考不调工具"和"单个超长命令"这两种沉默 |
 | `minToolCalls` | 2 次 | 少于这么多次调用不打断，免得一句话长思考也被点名 |
 
-一次真人用户消息会重置计时器。子代理（`workflow` / `subagent` 起的）不会被提醒。
+一次真人用户消息会重置计时器；**模型自己说了可见文字也算汇报**（监听 `assistant-stream` 的 `text-delta`），所以不会出现"刚汇报完三分钟又被提醒"。内部思考（`reasoning-delta`）不算，用户看不见。子代理（`workflow` / `subagent` 起的）不会被提醒；闲置超过 5 分钟的会话不会被定时器叫醒。
 
 ## 提醒长什么样
 
-注入的是一条 `form: "notice"` 的消息 —— **不是用户发言**，不会污染对话历史：
+注入的是一条 `form: "notice"` 的消息 —— **不是用户发言**，不会污染对话历史。
+
+**第一条**给完整规则：
 
 ```
 【进度检查点】已连续 12 次工具调用、10 分钟没说话。
 
 不要停手，也别单独发一条纯文字消息：在接下来这条回复里，先写一行进度，
 紧接着把原本要调的工具一起发出去。
+
+进度 x/y · 已完成：… · 正在：… · 下一步：… · 风险：无 / <具体风险>
 ```
 
-文案可以整段替换：设置页里 `template` 留空用内置，填了就整段由你写，支持 `{minutes}` `{calls}` `{slow}` 三个占位符；`lang` 可选 `auto` / `zh` / `en`。
+**之后每条只发一行**（同一段规则重复三遍只会占上下文）：
+
+```
+【进度检查点】又过了 10 分钟、12 次调用没吭声。这一条回复里先补一行
+「进度 x/y · 正在：… · 下一步：…」，然后接着干。
+```
+
+文案可以整段替换：设置页里 `template` 留空用内置，填了就整段由你写，支持 `{minutes}` `{calls}` `{slow}` 三个占位符；`lang` 可选 `auto` / `zh` / `en`。设置页有**实时预览**，改参数时直接看到两种形态长什么样。
 
 ## 在哪调
 
@@ -81,7 +95,7 @@ dsh plugin --profile desktop add dsh-progress-report
 16:48:31 test delivered=true agent=yes
 ```
 
-设置页的「状态」区会显示上次触发的时刻和原因、以及遇到的慢工具。点 **发一条测试提醒** 可以随时验证整条链路通不通。
+设置页的「状态」区会显示最近 6 次提醒（时间、原因、间隔、**按会话区分**）、以及遇到的慢工具。点 **发一条测试提醒** 可以随时验证整条链路通不通。
 
 ## 和类似插件的区别
 
@@ -91,19 +105,25 @@ dsh plugin --profile desktop add dsh-progress-report
 | --- | --- | --- | --- |
 | `dsh-progress-nudge` | 连续 N 轮只调工具 | 可见的**用户消息** | 无 |
 | `dsh-narrator` | 静默时长（可调最小间隔、可换文案） | 可见的**用户消息**，另镜像到浮窗 | 无 |
-| **本插件** | **墙钟间隔** + 调用次数兜底 + 慢工具 | `form:"notice"` 经 `additionalContexts`，**不算用户发言** | 触发日志 + 设置页状态 |
+| **本插件** | **墙钟间隔** + 调用次数兜底 + 慢工具 + 30 秒定时器 | `form:"notice"` 经 `additionalContexts`，**不算用户发言** | 触发日志 + 设置页状态（按会话） |
 
 实际差别在注入形态：notice 直接送到模型，但不会在对话里冒充用户说过什么，也就不会被后来的压缩当成"用户说过这句话"。
 
 ## 开发与测试
 
 ```bash
-npm test          # node --test test/*.test.mjs，13 条，不需要装任何依赖
+npm test          # node --test test/*.test.mjs，17 条，不需要装任何依赖
+npm run test:clean # 把 files 白名单复制到空目录再加载 = 模拟"用户装了个包"
+npm run check     # 两个入口文件的语法检查
 ```
 
-测试覆盖：触发阈值、计数归零、真人发话重置、文案占位符、慢工具点名、子代理不提醒、越界钳位、非法值回默认、中英双语、存档往返、首次播种。CI 在 `.github/workflows/ci.yml`（node 22/24 矩阵 + 零依赖断言）。
+测试覆盖：触发阈值、计数归零、真人发话重置、**模型说话即清零**、**推理不算汇报**、**首条完整/后续一行**、自定义文案不区分首条、文案占位符、慢工具点名、子代理不提醒、越界钳位、非法值回默认、中英双语、存档往返、首次播种。CI 在 `.github/workflows/ci.yml`（node 22/24 矩阵 + 零依赖断言 + 上面三条一起跑）。
 
 插件不绑 profile：路径全部来自 `DSH_HOME`，desktop 与 bili-duty 用的是同一份代码，只是各自的 `progress-report.json` 与日志分开。
+
+## 变更记录
+
+见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 卸载
 
