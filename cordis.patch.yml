@@ -1,15 +1,16 @@
 # ============================================================================
 # dsh-progress-report — DSH bundle patch
 # ============================================================================
-# 挂载声明：DSH 启动时按 `dsh.profile.bundles` 的顺序，把每个 bundle 的 patch
-# 叠进配置树。安装之后，profile 只要在 `dsh.profile.bundles` 里列出本包名
-# 即生效，不用手改 profile 自己的 cordis.patch.yml。
+# 什么时候生效：DSH 启动时按 profile 的 `dsh.profile.bundles` 顺序把每个 bundle 的
+# patch 叠进配置树。装好之后，profile 只要在 `dsh.profile.bundles` 里列出本包名
+# 就生效，不用手改 profile 自己的 cordis.patch.yml。
 #
 # 安装：
-#   dsh plugin --profile desktop add link:C:/Users/Lenovo/.dsh/plugins/dsh-progress-report
+#   dsh plugin --profile desktop add dsh-progress-report          # 从 npm
+#   dsh plugin --profile desktop add link:C:/path/to/this/folder  # 本地开发
 #
-# 下面只是**出厂默认值**。运行期想改，改 ~/.dsh/progress-report.json（首次启动自动生成），
-# 改完下一次工具调用就生效，不用重启、不用重装。
+# 下面是**出厂默认值**。运行期想改，改 ~/.dsh/progress-report.json（首次启动自动生成），
+# 或者在 设置 › 进度汇报 里改；改完下一次工具调用就生效，不用重启、不用重装。
 # ============================================================================
 
 - insert:
@@ -22,7 +23,13 @@
         maxToolCalls: 12
         # 兜底提醒也至少隔这么多分钟，免得密集调用时变成每分钟一次
         minGapMinutes: 3
-        # 至少执行过这么多次工具调用才提醒，避免一句话思考就被打断
+        # 至少执行过这么多次工具调用才提醒，避免一句话长思考就被打断
         minToolCalls: 2
-        # 提醒里是否带上"顺手更新 todo_write"
+        # 提醒里是否带上「顺手更新 todo_write」
         mentionTodo: true
+        # 提醒文案语言：auto / zh / en
+        lang: auto
+        # 自定义提醒全文，留空 = 内置；占位符 {minutes} {calls} {slow}
+        template: ''
+        # 单个工具跑超过这么多秒算"慢工具"，下次提醒里会点出来
+        slowToolSeconds: 60
