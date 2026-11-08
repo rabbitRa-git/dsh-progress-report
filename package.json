@@ -1,13 +1,15 @@
 {
   "name": "dsh-progress-report",
-  "version": "0.3.1",
-  "description": "DSH 插件：长任务期间按时间/步数强制模型向用户汇报进度，跑偏可及时纠正。零依赖，带设置页。",
+  "version": "0.4.0",
+  "description": "Make a DSH agent report progress on long tasks: a host-side timer injects a one-line progress notice after N minutes or M tool calls. Zero dependencies, settings page, trigger log.",
   "keywords": [
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
     "progress",
-    "report"
+    "report",
+    "status",
+    "long-running"
   ],
   "license": "MIT",
   "author": "rabbitRa-git",
@@ -32,6 +34,9 @@
     "cordis.patch.yml",
     "README.md"
   ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "engines": {
     "node": ">=22"
   },
