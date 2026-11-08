@@ -3,7 +3,7 @@
  * 跑法：node --test test/
  */
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -215,4 +215,16 @@ test('存档文件可以再读回来', () => {
   const back = testing.coerce(JSON.parse(raw), testing.DEFAULTS);
   assert.equal(back.intervalMinutes, 7);
   assert.equal(back.template, 'x {calls} y');
+});
+
+test('配置文件不存在时，插件自己播种一份', () => {
+  // 删掉文件，模拟"刚装上、还没人碰过设置"
+  rmSync(join(process.env.DSH_HOME, 'progress-report.json'), { force: true });
+  const { ctx } = makeCtx();
+  mod.apply(ctx, { intervalMinutes: 7, maxToolCalls: 4 });
+  const text = readFileSync(join(process.env.DSH_HOME, 'progress-report.json'), 'utf8');
+  const seeded = JSON.parse(text);
+  assert.equal(seeded.intervalMinutes, 7);
+  assert.equal(seeded.maxToolCalls, 4);
+  assert.equal(seeded.lang, 'auto');
 });
