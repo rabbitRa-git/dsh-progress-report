@@ -87,6 +87,12 @@ window.__ModuleLoader__.load({
   border:1px solid var(--dsw-alias-bg-layer-3,rgba(128,128,128,.22));
   background:var(--dsw-alias-bg-layer-4,rgba(128,128,128,.12));color:inherit;}
 [data-pr-list]{display:flex;flex-direction:column;gap:4px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary,#9aa0a6);}
+[data-pr-prev]{display:flex;flex-direction:column;gap:4px;}
+[data-pr-prev-t]{font-size:11px;color:var(--dsw-alias-label-tertiary,#9aa0a6);}
+[data-pr-prev] pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:17px;
+  font-family:ui-monospace,Consolas,monospace;padding:8px 10px;border-radius:8px;
+  background:var(--dsw-alias-bg-layer-4,rgba(128,128,128,.12));
+  border-left:2px solid #3b82f6;color:inherit;}
     `
 
     const ROW_DEFS = [
@@ -268,8 +274,50 @@ window.__ModuleLoader__.load({
         patch('template', cur + (cur && !cur.endsWith(' ') ? ' ' : '') + tok)
       }
 
-      const lastFireText = (() => {
-        const f = state.lastFire
+      // ---- 文案预览：和 lib/index.js 的 buildText 保持同一套措辞 ----
+      const sampleLang = (() => {
+        if (draft.lang === 'en') return 'en'
+        if (draft.lang === 'zh') return 'zh'
+        try {
+          return String(navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'zh'
+        } catch {
+          return 'zh'
+        }
+      })()
+      const sampleMinutes = Number(draft.intervalMinutes) || 10
+      const sampleCalls =
+        Number(draft.maxToolCalls) > 0
+          ? Number(draft.maxToolCalls)
+          : Math.max(1, Number(draft.minToolCalls) || 2)
+      const tplTrimmed = String(draft.template || '').trim()
+      const fillTpl = (s) =>
+        s
+          .replace(/\{minutes\}/g, String(sampleMinutes))
+          .replace(/\{calls\}/g, String(sampleCalls))
+          .replace(/\{slow\}/g, 'pwsh 120s')
+      const previewFull = tplTrimmed
+        ? fillTpl(tplTrimmed)
+        : sampleLang === 'en'
+          ? `[progress check] ${sampleCalls} tool calls and ${sampleMinutes} min since you last said anything.\n… (5 more lines of rules)`
+          : `【进度检查点】已连续 ${sampleCalls} 次工具调用、${sampleMinutes} 分钟没说话。\n…（后面还有 5 行完整规则）`
+      const previewShort = tplTrimmed
+        ? fillTpl(tplTrimmed)
+        : sampleLang === 'en'
+          ? `[progress check] another ${sampleMinutes} min / ${sampleCalls} tool calls without a word. Lead your next reply with one line: \`progress x/y · doing: … · next: …\`, then carry on.`
+          : `【进度检查点】又过了 ${sampleMinutes} 分钟、${sampleCalls} 次调用没吭声。这一条回复里先补一行「进度 x/y · 正在：… · 下一步：…」，然后接着干。`
+
+      const clockOf = (ts) => {
+        try {
+          const d = new Date(ts)
+          const p = (n) => String(n).padStart(2, '0')
+          return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+        } catch {
+          return '--:--'
+        }
+      }
+      const shortSession = (id) => (id ? String(id).replace(/^session-/, '').slice(0, 8) : '未知')
+
+      const lastFireText = (() => {        const f = state.lastFire
         if (!f || !f.at) return '这个会话里还没触发过。'
         const d = new Date(f.at)
         const hh = String(d.getHours()).padStart(2, '0')
@@ -390,6 +438,29 @@ window.__ModuleLoader__.load({
                 onChange: (e) => patch('template', e.target.value),
               }),
 
+              h('div', { 'data-pr-note': '' }, '预览 · PREVIEW（按上面这些参数算出来的样子）'),
+              h(
+                'div',
+                { 'data-pr-prev': '' },
+                h('div', { 'data-pr-prev-t': '' }, '第一条 · 完整规则'),
+                h('pre', {}, previewFull),
+              ),
+              tplTrimmed
+                ? null
+                : h(
+                    'div',
+                    { 'data-pr-prev': '' },
+                    h('div', { 'data-pr-prev-t': '' }, '之后每条 · 只发一行'),
+                    h('pre', {}, previewShort),
+                  ),
+              tplTrimmed
+                ? h('div', { 'data-pr-note': '' }, '填了自定义文案：每次都用你写的这段，不再区分首条和后续。')
+                : h(
+                    'div',
+                    { 'data-pr-note': '' },
+                    '同一段规则重复三遍只是占上下文，所以第一次给完整规则，之后每次只发一行提醒。',
+                  ),
+
               h(
                 'div',
                 { 'data-pr-row': '' },
@@ -435,6 +506,16 @@ window.__ModuleLoader__.load({
           { 'data-pr-sec': '' },
           h('div', { 'data-pr-h': '' }, '状态 · STATUS'),
           h('div', { 'data-pr-note': '' }, lastFireText),
+          state.recent && state.recent.length
+            ? h(
+                'div',
+                { 'data-pr-list': '' },
+                h('div', {}, '最近几次提醒（按会话，最多 6 条）'),
+                ...state.recent.map((r, i) =>
+                  h('div', { key: i }, `· ${clockOf(r.at)} ${r.reason} · 距上次 ${r.minutes} 分钟 / ${r.calls} 次调用 · 会话 ${shortSession(r.session)}`),
+                ),
+              )
+            : h('div', { 'data-pr-note': '' }, '最近几分钟还没有提醒记录。'),
           state.slowTools && state.slowTools.length
             ? h(
                 'div',
